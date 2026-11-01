@@ -39,16 +39,14 @@ const renderDisclosureItems = (items: any[]) => {
 
 const FnGlobalUnderstanding: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const { funcGlobal, setFuncGlobal } = useStore();
 
   const handleResponseReceived = useCallback(
-    (receivedResponse: string | null, receivedError?: string | null) => {
+    (receivedResponse: string | null) => {
       if (receivedResponse) {
         const jsonResponse = extractJsonFromText(receivedResponse);
         setFuncGlobal(jsonResponse);
       }
-      if (receivedError) setError(receivedError);
     },
     []
   );
@@ -71,7 +69,7 @@ const FnGlobalUnderstanding: React.FC = () => {
         disabled={!funcGlobal && loading}
         className='ml-auto'
       />
-      {error && <div>Error: {error}</div>}
+
       <div className='mx-auto w-full max-w-lg divide-y divide-black/5 rounded-xl'>
         {!funcGlobal && loading ? (
           <Spinner
@@ -82,7 +80,7 @@ const FnGlobalUnderstanding: React.FC = () => {
           <>{renderDisclosureItems(understandings)}</>
         )}
       </div>
-      {!loading && !funcGlobal && (
+      {!funcGlobal && (
         <GptComponent
           queryType='P7_R7_projectStructureJson'
           onResponseReceived={handleResponseReceived}

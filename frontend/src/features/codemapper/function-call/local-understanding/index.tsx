@@ -205,7 +205,7 @@ const FnLocalUnderstanding: React.FC = () => {
       </div>
 
 
-        {funcSelectedNode && !funcLocalDot && !isFuncLocalLoading && (
+        {funcSelectedNode && !funcLocalDot && (
           <GptComponent
             queryType='P9_R9_functionCallFlow'
             params={{ selectedNode: funcSelectedNode }}
@@ -214,7 +214,7 @@ const FnLocalUnderstanding: React.FC = () => {
           />
         )}
 
-        {funcSelectedNode && !funcLocalHighlight && !isFuncLocalLoading && (
+        {funcSelectedNode && !funcLocalHighlight && (
           <GptComponent
             queryType='P8_R8_functionCallLocalDesc'
             params={{ selectedNode: funcSelectedNode }}
@@ -223,7 +223,7 @@ const FnLocalUnderstanding: React.FC = () => {
           />
         )}
 
-        {funcSelectedNode && !funcLocalRelevant && !isFuncLocalLoading && (
+        {funcSelectedNode && !funcLocalRelevant && (
           <GptComponent
             queryType='P10_R10_functionCallLocalExplain'
             params={{ selectedNode: funcSelectedNode }}

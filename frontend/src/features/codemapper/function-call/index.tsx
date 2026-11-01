@@ -19,6 +19,7 @@ const FunctionCall: React.FC = () => {
   const handleResponseReceived = useCallback(
     (receivedResponse: string | null, receivedError?: string | null) => {
       if (receivedResponse) {
+        setError(null);
         const jsonResponse = extractJsonFromText(receivedResponse);
         const dotResponse = extractDotContent(receivedResponse);
         setResponse(dotResponse);
@@ -46,8 +47,8 @@ const FunctionCall: React.FC = () => {
   return (
     <>
       {isFuncLoading &&  <div className='my-48'><Spinner loadingText='Loading Global Map of the Codebase' /></div>}
-      {error && <div>Error: {error}</div>}
-      {response && !isFuncLoading && !error && (
+
+      {response && !error && (
         <div>
           <div className='w-full h-screen overflow-hidden'>
             <AnalysisGraph dotData={response} understanding='functioncall' />
@@ -67,7 +68,7 @@ const FunctionCall: React.FC = () => {
         </div>
       )}
       <Toolbar isOpen={isToolbarOpen} onClose={toggleToolbar} type='FUNCTION_CALL' />
-      {!funcDot && !isFuncLoading && !error && (
+      {!funcDot && (
         <GptComponent
           queryType='P7_R7_projectStructureJson'
           onResponseReceived={handleResponseReceived}

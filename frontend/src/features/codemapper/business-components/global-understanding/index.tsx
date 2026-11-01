@@ -51,16 +51,14 @@ const renderDisclosureItems = (items: any[]) => {
 
 const BizGlobalUnderstanding: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const { bizGlobal, setBizGlobal } = useStore();
 
   const handleResponseReceived = useCallback(
-    (receivedResponse: string | null, receivedError?: string | null) => {
+    (receivedResponse: string | null) => {
       if (receivedResponse) {
         const jsonResponse = extractJsonFromText(receivedResponse);
         setBizGlobal(jsonResponse);
       }
-      if (receivedError) setError(receivedError);
     },
     []
   );
@@ -83,7 +81,7 @@ const BizGlobalUnderstanding: React.FC = () => {
         disabled={!bizGlobal && loading}
         className='ml-auto'
       />
-      {error && <div>Error: {error}</div>}
+
       <div className='mx-auto w-full max-w-lg divide-y divide-black/5 rounded-xl'>
         {!bizGlobal && loading ? (
           <Spinner
@@ -94,7 +92,7 @@ const BizGlobalUnderstanding: React.FC = () => {
           <>{renderDisclosureItems(understandings)}</>
         )}
       </div>
-      {!loading && !bizGlobal && (
+      {!bizGlobal && (
           <GptComponent
             queryType='P2_R2_systemStructureDot'
             onResponseReceived={handleResponseReceived}

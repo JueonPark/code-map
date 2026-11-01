@@ -4,6 +4,7 @@ import NotFound from '@/features/misc/error/NotFound';
 import { Routes, Route } from 'react-router-dom';
 import FunctionCall from '@/features/codemapper/function-call';
 import BusinessComponents from '@/features/codemapper/business-components';
+import ProjectImport from '@/features/project-import';
 
 export const AppRouter = () => {
   return (
@@ -16,7 +17,8 @@ export const AppRouter = () => {
          * Routes under this can only be accessed after user uploads source code files.
          */}
         <Route path='/' element={<App />}>
-          <Route index element={<CodeMapper />} />
+          <Route index element={<ProjectImport />} />
+          <Route path='/legacy' element={<CodeMapper />} />
           <Route path='/understand/business-comps' element={<BusinessComponents />} />
           <Route path='/understand/function-call' element={<FunctionCall />} />
         </Route>
