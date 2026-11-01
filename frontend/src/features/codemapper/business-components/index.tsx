@@ -19,6 +19,7 @@ const BusinessComponents: React.FC = () => {
   const handleResponseReceived = useCallback(
     (receivedResponse: string | null, receivedError?: string | null) => {
       if (receivedResponse) {
+        setError(null);
         const jsonResponse = extractJsonFromText(receivedResponse);
         const dotResponse = extractDotContent(receivedResponse);
         setResponse(dotResponse);
@@ -46,7 +47,7 @@ const BusinessComponents: React.FC = () => {
   return (
     <>
       {isBizLoading &&  <div className='my-48'><Spinner loadingText='Loading Global Map of the Codebase' /></div>}
-      {error && <div>Error: {error}</div>}
+
       {response && !error && (
         <div>
           <div className='w-full h-screen overflow-hidden'>
@@ -67,7 +68,7 @@ const BusinessComponents: React.FC = () => {
         </div>
       )}
       <Toolbar isOpen={isToolbarOpen} onClose={toggleToolbar} type='BUSINESS' />
-      {!bizDot && !error && (
+      {!bizDot && (
         <GptComponent
           queryType='P2_R2_systemStructureDot'
           onResponseReceived={handleResponseReceived}

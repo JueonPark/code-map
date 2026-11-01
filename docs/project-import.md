@@ -18,6 +18,10 @@ Paths are interpreted by the Python service, not the browser. A service inside U
 
 Both methods produce the same relative-path/source model. A ZIP's single wrapping directory is removed. ZIP contents are read in memory and never extracted to disk. Symlinks and ZIP traversal paths are rejected. Source files remain unchanged.
 
+Before reading, the service validates the actual opened file handle and its regular-file type, so replacing a source path or ancestor with a symlink during import cannot read outside the project. Linux requires `/proc/self/fd`; Windows uses `GetFinalPathNameByHandleW`.
+
+Model-generated SVG links and resource/event attributes are removed before insertion. Provider failures and malformed graph/explanation output show a retry action in place, including local-node analyses.
+
 - Up to 2,000 entries, 256 KiB per included source file, 2 MiB of included source per project; ZIP total uncompressed size is also limited to 2 MiB (including excluded entries). ZIP upload limit: 10 MiB.
 - UTF-8 source/documentation/configuration formats listed in `server/app.py`; unsupported, binary and non-UTF-8 files are excluded.
 - `.git`, dependency/virtualenv/cache directories, common build directories, `.aws`, `.ssh`, `.env*`, `id_*`, credential/secret filenames and key/certificate extensions are excluded by default. These filename rules cannot identify secrets embedded in ordinary source; review the preview and prepare a clean directory/archive when needed.

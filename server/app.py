@@ -9,6 +9,7 @@ import threading
 import urllib.error
 import urllib.request
 import zipfile
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 
@@ -18,6 +19,40 @@ MAX_TOTAL = 2 * 1024 * 1024
 MAX_UPLOAD = 10 * 1024 * 1024
 SKIP_DIRS = {'.git', '.svn', '.hg', 'node_modules', 'build', 'dist', 'target', '.venv', 'venv', '__pycache__', '.cache', '.aws', '.ssh'}
 EXTENSIONS = {'.py', '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.cpp', '.cc', '.c', '.h', '.hpp', '.cu', '.rs', '.go', '.java', '.kt', '.rb', '.php', '.swift', '.cs', '.md', '.txt', '.json', '.yaml', '.yml', '.toml', '.xml', '.html', '.css', '.scss', '.sql', '.sh', '.cmake', '.td', '.mlir'}
+
+
+def opened_path(fd):
+    """Resolve the actual opened handle, not a path that can be swapped."""
+    if os.name != 'nt':
+        return Path(f'/proc/self/fd/{fd}').resolve(strict=True)
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+    get_path = ctypes.WinDLL('kernel32', use_last_error=True).GetFinalPathNameByHandleW
+    get_path.argtypes = [wintypes.HANDLE, wintypes.LPWSTR, wintypes.DWORD, wintypes.DWORD]
+    get_path.restype = wintypes.DWORD
+    buffer = ctypes.create_unicode_buffer(32768)
+    size = get_path(msvcrt.get_osfhandle(fd), buffer, len(buffer), 0)
+    if not size or size >= len(buffer):
+        raise ValueError('Cannot verify the opened source file.')
+    value = buffer.value
+    if value.startswith('\\\\?\\UNC\\'):
+        value = '\\\\' + value[8:]
+    elif value.startswith('\\\\?\\'):
+        value = value[4:]
+    return Path(value)
+
+
+def read_source(path, root):
+    flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_BINARY', 0)
+    fd = os.open(path, flags)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode) or not opened_path(fd).is_relative_to(root):
+            raise ValueError('Opened source is not a regular file inside the project.')
+        with os.fdopen(fd, 'rb', closefd=False) as stream:
+            return stream.read(MAX_FILE + 1)
+    finally:
+        os.close(fd)
 
 
 def excluded(name):
@@ -88,11 +123,10 @@ def import_path(value, roots):
                 if not path.is_file():
                     raise ValueError('Only regular source files are supported.')
                 def read(path=path):
-                    # Recheck immediately before opening; never follow a replaced symlink.
+                    # Validate again, then verify the opened handle before reading.
                     if path.is_symlink() or not path.resolve().is_relative_to(root):
                         raise ValueError('Source path changed during import.')
-                    with path.open('rb') as stream:
-                        return stream.read(MAX_FILE + 1)
+                    return read_source(path, root)
                 yield path.relative_to(root).as_posix(), path.stat().st_size, read
     try:
         return collect(root.name, entries())
@@ -133,7 +167,7 @@ def import_zip(raw, name):
                             return stream.read(MAX_FILE + 1)
                     yield path, info.file_size, read
             return collect(next(iter(common)) if strip else Path(name).stem or 'ZIP project', source_entries())
-    except (zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError) as exc:
+    except (zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, zlib.error) as exc:
         raise ValueError('Invalid, encrypted or unsupported ZIP archive.') from exc
 
 

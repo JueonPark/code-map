@@ -5,7 +5,7 @@ const { chromium } = require(process.env.CODEMAP_PLAYWRIGHT || 'playwright');
   try {
     const page = await browser.newPage();
     const errors = [], calls = [];
-    let id = 'project-A', approved = false, fail = false;
+    let id = 'project-A', approved = false, fail = false, malformed = false;
     page.on('pageerror', e => errors.push(e.message));
     await page.route('**/api/**', async route => {
       const endpoint = route.request().url().split('/api/')[1];
@@ -19,7 +19,8 @@ const { chromium } = require(process.env.CODEMAP_PLAYWRIGHT || 'playwright');
         assert.equal(body.id, id);
         calls.push(body);
         if (fail) { await route.fulfill({status: 400, json: {error: 'Provider unavailable'}}); return; }
-        result = {text: '```json\n{"projectOverview":{"summary":"'+id+'"},"keyModules":{},"projectArchitectureGuide":[]}\n```\n```dot\ndigraph G { main [label="'+id+'"]; }\n```'};
+        if (malformed) { await route.fulfill({json: {text: 'No graph was generated.'}}); return; }
+        result = {text: '```json\n{"projectOverview":{"summary":"'+id+'"},"keyModules":{},"projectArchitectureGuide":[]}\n```\n```dot\ndigraph G { main [label="'+id+'", URL="javascript:window.__codemapInjected=true"]; }\n```'};
       }
       await route.fulfill({json: result});
     });
@@ -33,6 +34,7 @@ const { chromium } = require(process.env.CODEMAP_PLAYWRIGHT || 'playwright');
     await page.getByRole('button', {name: 'Analyze Business Components'}).click();
     await page.getByRole('button', {name: 'Regenerate this graph'}).waitFor();
     await page.locator('#graph-container svg').waitFor();
+    assert.equal(await page.locator('#graph-container svg').evaluate(svg => [...svg.querySelectorAll('*')].some(el => [...el.attributes].some(a => /href$/i.test(a.name) && /^javascript:/i.test(a.value)))), false, 'model-generated SVG must not contain executable links');
     assert.ok(calls.some(c => c.prompt.includes('system structure')));
     assert.equal(calls.length, 1, 'graph and overview should share one in-flight request');
     await page.evaluate(async () => {
@@ -61,6 +63,13 @@ const { chromium } = require(process.env.CODEMAP_PLAYWRIGHT || 'playwright');
     fail = true;
     await page.getByRole('button', {name: 'Regenerate this graph'}).click();
     await page.getByText('Error: Provider unavailable').waitFor();
+    fail = false;
+    malformed = true;
+    await page.getByRole('button', {name: 'Retry analysis'}).click();
+    await page.getByText('Error: Analysis did not contain a DOT graph. Please retry.').waitFor();
+    malformed = false;
+    await page.getByRole('button', {name: 'Retry analysis'}).click();
+    await page.getByRole('button', {name: 'Regenerate this graph'}).waitFor();
     assert.deepEqual(errors, []);
     console.log('PASS: path/ZIP preview, consent gate, both graph modes, project switch, provider errors');
   } finally { await browser.close(); }

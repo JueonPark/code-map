@@ -5,6 +5,8 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 import json
+import os
+import struct
 import threading
 import urllib.request
 import urllib.error
@@ -62,6 +64,54 @@ class ImportTests(unittest.TestCase):
         with patch('app.MAX_TOTAL', 4):
             with self.assertRaises(ValueError):
                 import_zip(archive({'main.py': '12345'}), 'large.zip')
+
+    def test_corrupt_compressed_data_is_a_validation_error(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as z:
+            z.writestr('main.py', 'print(42)')
+        raw = bytearray(buf.getvalue())
+        filename_size, extra_size = struct.unpack_from('<HH', raw, 26)
+        raw[30 + filename_size + extra_size] = 7  # Invalid DEFLATE block type.
+        with self.assertRaisesRegex(ValueError, 'Invalid'):
+            import_zip(bytes(raw), 'corrupt.zip')
+
+    @unittest.skipIf(os.name == 'nt', 'Symlink creation requires Windows privileges; Linux race regression')
+    def test_file_swap_cannot_read_outside_root(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / 'project'
+            root.mkdir()
+            source, outside = root / 'main.py', Path(d) / 'outside.py'
+            source.write_text('allowed')
+            outside.write_text('PRIVATE_OUTSIDE_ROOT')
+            real_open = os.open
+            def swap(path, flags, *args, **kwargs):
+                if Path(path) == source:
+                    source.unlink()
+                    source.symlink_to(outside)
+                return real_open(path, flags, *args, **kwargs)
+            with patch('app.os.open', side_effect=swap):
+                with self.assertRaises(ValueError):
+                    import_path(str(root), [root])
+
+    @unittest.skipIf(os.name == 'nt', 'Symlink creation requires Windows privileges; Linux race regression')
+    def test_parent_swap_cannot_read_outside_root(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / 'project'
+            folder = root / 'src'
+            outside = Path(d) / 'outside'
+            folder.mkdir(parents=True)
+            outside.mkdir()
+            (folder / 'main.py').write_text('allowed')
+            (outside / 'main.py').write_text('PRIVATE_OUTSIDE_ROOT')
+            real_open = os.open
+            def swap(path, flags, *args, **kwargs):
+                if Path(path) == folder / 'main.py':
+                    folder.rename(root / 'old-src')
+                    folder.symlink_to(outside, target_is_directory=True)
+                return real_open(path, flags, *args, **kwargs)
+            with patch('app.os.open', side_effect=swap):
+                with self.assertRaises(ValueError):
+                    import_path(str(root), [root])
 
     def test_analysis_requires_approval_and_configuration(self):
         p = import_zip(archive({'main.py': 'print(42)'}), 'demo.zip')

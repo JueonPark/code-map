@@ -86,6 +86,13 @@ export const AnalysisGraph: React.FC<AnalysisGraphProps> = ({
 
         try {
           const graph = graphviz(graphContainer)
+            .attributer((data) => {
+              // Model output is untrusted. Strip navigation/resource/event attributes
+              // before d3 applies them to the live SVG (including xlink:href).
+              for (const name of Object.keys(data.attributes || {})) {
+                if (/href$|^on|^style$|^src$/i.test(name)) delete data.attributes[name];
+              }
+            })
             .renderDot(dotData)
             .growEnteringEdges(true)
             .fit(true);
