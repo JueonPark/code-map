@@ -1,5 +1,13 @@
 # CodeMap
 
+## Local project import
+
+You can now import your own codebase from a **directory path or ZIP archive**. Review the included/excluded files before starting Business Components or Function Call analysis. Chat and explanations use the same approved source snapshot.
+
+Start the Python 3.10+ local service with `python server/app.py --root /path/to/projects`, then run `npm ci` and `npm run dev` in `frontend`. Open **http://127.0.0.1:5173**. Configure `OPENAI_API_KEY` and `OPENAI_MODEL` in the service environment for analysis; preview works without them. Credentials stay on the server.
+
+See [Project import setup, Windows/WSL paths, limits and tests](docs/project-import.md) for complete instructions. The legacy Assistant setup below is retained as historical prototype documentation and is not used by the new application flow.
+
 ## Overview
 
 CodeMap is an interactive tool designed to aid individuals in learning new projects, onboarding onto codebases, and understanding source code structures. It provides an engaging and visual approach with interactive graphs, detailed descriptions, and overviews to enhance comprehension. Integrated with ChatGPT, users can gain deeper insights and context about the code while browsing.

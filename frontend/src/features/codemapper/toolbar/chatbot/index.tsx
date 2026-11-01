@@ -7,7 +7,6 @@ import { UserCircleIcon } from '@heroicons/react/16/solid';
 import IconButton from '@/components/Elements/Button/IconButton';
 import chatService from '@gpt/chatService';
 import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import useStore from '@/store/store';
 
@@ -80,8 +79,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ toggleChatbotContainer, context
         });
       });
     } catch (error) {
-      console.error(error);
-      // add error handling logic here
+      setChats(prev => [...prev, {role: 'assistant', content: error instanceof Error ? error.message : String(error)}]);
     } finally {
       setIsTyping(false);
     }
@@ -170,7 +168,8 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ chats }) => {
                   className={`bg-gray-100 p-2.5 rounded-md text-gray-800 text-sm flex-1 markdown-content`}
                 >
                   <ReactMarkdown 
-                    rehypePlugins={[rehypeRaw]} 
+                    skipHtml
+                    components={{ img: () => null }}
                     remarkPlugins={[remarkGfm]}
                   >
                     {chat.content}

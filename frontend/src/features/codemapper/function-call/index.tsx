@@ -47,7 +47,7 @@ const FunctionCall: React.FC = () => {
     <>
       {isFuncLoading &&  <div className='my-48'><Spinner loadingText='Loading Global Map of the Codebase' /></div>}
       {error && <div>Error: {error}</div>}
-      {response && !isFuncLoading && !error && (
+      {response && !error && (
         <div>
           <div className='w-full h-screen overflow-hidden'>
             <AnalysisGraph dotData={response} understanding='functioncall' />
@@ -67,7 +67,7 @@ const FunctionCall: React.FC = () => {
         </div>
       )}
       <Toolbar isOpen={isToolbarOpen} onClose={toggleToolbar} type='FUNCTION_CALL' />
-      {!funcDot && !isFuncLoading && !error && (
+      {!funcDot && !error && (
         <GptComponent
           queryType='P7_R7_projectStructureJson'
           onResponseReceived={handleResponseReceived}

@@ -47,7 +47,7 @@ const BusinessComponents: React.FC = () => {
     <>
       {isBizLoading &&  <div className='my-48'><Spinner loadingText='Loading Global Map of the Codebase' /></div>}
       {error && <div>Error: {error}</div>}
-      {response && !isBizLoading && !error && (
+      {response && !error && (
         <div>
           <div className='w-full h-screen overflow-hidden'>
             <AnalysisGraph dotData={response} understanding='businesscomponent' />
@@ -67,7 +67,7 @@ const BusinessComponents: React.FC = () => {
         </div>
       )}
       <Toolbar isOpen={isToolbarOpen} onClose={toggleToolbar} type='BUSINESS' />
-      {!bizDot && !isBizLoading && !error && (
+      {!bizDot && !error && (
         <GptComponent
           queryType='P2_R2_systemStructureDot'
           onResponseReceived={handleResponseReceived}

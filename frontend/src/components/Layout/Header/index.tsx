@@ -7,6 +7,7 @@ import { Route, Routes, useNavigate } from 'react-router-dom';
 import IconButton from '@/components/Elements/Button/IconButton';
 import { Bars3BottomRightIcon } from '@heroicons/react/24/outline';
 import FnCallWhite from '@/assets/icons/code_white.png';
+import { currentProject } from '@/project';
 import FnCallBlack from '@/assets/icons/code_black.png';
 import BizCompWhite from '@/assets/icons/tree_white.png';
 import BizCompBlack from '@/assets/icons/tree_black.png';
@@ -35,6 +36,9 @@ export const Header: React.FC = () => {
             <img className='h-10' src={CodeMapLogo} alt='logo' />
           </div>
           <div className='flex w-full gap-4 ms-8'>
+            <button onClick={() => navigate('/')} className='text-xs text-left'>
+              {currentProject()?.name || 'No project'} · Import / switch project
+            </button>
             <Routes>
               <Route
                 path='/business-comps'

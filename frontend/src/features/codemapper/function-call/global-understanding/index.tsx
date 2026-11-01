@@ -82,7 +82,7 @@ const FnGlobalUnderstanding: React.FC = () => {
           <>{renderDisclosureItems(understandings)}</>
         )}
       </div>
-      {!loading && !funcGlobal && (
+      {!funcGlobal && (
         <GptComponent
           queryType='P7_R7_projectStructureJson'
           onResponseReceived={handleResponseReceived}

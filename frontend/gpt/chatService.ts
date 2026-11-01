@@ -1,64 +1,19 @@
-import OpenAI from 'openai';
-import { API_KEY } from './api';
-import { assistantId } from './api'
-
-const openai = new OpenAI({
-  apiKey: API_KEY,
-  dangerouslyAllowBrowser: true // For development/testing purposes only
-});
-
-// const assistantId = "asst_1rm5Iq7odQeJcMwC8sCbAzx3";//task1
-
-// const assistantId= "asst_eZnQNP4eRvWUY3QPk1dlB2eK"//task2
-
+import { analyzeProject, currentProject } from '@/project';
 class ChatService {
-  private threadId: string | null = null;
-
+  private history: { role: string; content: string }[] = [];
+  private projectId: string | undefined;
   async initializeThread() {
-    const thread = await openai.beta.threads.create();
-    this.threadId = thread.id;
-    return this.threadId;
+    const id = currentProject()?.id;
+    if (id !== this.projectId) { this.history = []; this.projectId = id; }
+    return id;
   }
-
   async sendMessage(message: string, onUpdate: (content: string) => void) {
-    if (!this.threadId) {
-      throw new Error('Thread not initialized');
-    }
-
-    await openai.beta.threads.messages.create(this.threadId, {
-      role: 'user',
-      content: message
-    });
-
-    const run = await openai.beta.threads.runs.createAndStream(
-      this.threadId,
-      { assistant_id: assistantId }
-    );
-
-    let assistantResponse = '';
-
-    return new Promise<string>((resolve, reject) => {
-      run
-        .on('textCreated', () => {
-          onUpdate('');
-        })
-        .on('textDelta', (delta) => {
-          assistantResponse += delta.value;
-          onUpdate(assistantResponse);
-        })
-        .on('completed', () => {
-          resolve(assistantResponse);
-        })
-        .on('error', (error) => {
-          console.error('Error:', error);
-          reject(error);
-        })
-        .on('end', () => {
-          // Ensure the Promise is resolved at the end of the stream
-          resolve(assistantResponse);
-        });
-    });
+    await this.initializeThread();
+    const text = await analyzeProject(message, this.history.slice(-18));
+    this.history.push({ role: 'user', content: message }, { role: 'assistant', content: text });
+    this.history = this.history.slice(-18);
+    onUpdate(text);
+    return text;
   }
 }
-
 export default new ChatService();

@@ -207,7 +207,7 @@ const BizLocalUnderstanding: React.FC = () => {
         </div>
       </div>
 
-      {bizSelectedNode && !bizLocalDot && !isBizLocalLoading && (
+      {bizSelectedNode && !bizLocalDot && (
         <GptComponent
           queryType='P3_R3_businessLocalGraph'
           params={{ selectedNode: bizSelectedNode }}
@@ -216,7 +216,7 @@ const BizLocalUnderstanding: React.FC = () => {
         />
       )}
 
-      {bizSelectedNode && !bizLocalHighlight && !isBizLocalLoading && (
+      {bizSelectedNode && !bizLocalHighlight && (
         <GptComponent
           queryType='P4_R4_businessFlowAnalysis'
           params={{ highlightedBusinessFlow: bizSelectedNode }}
@@ -225,7 +225,7 @@ const BizLocalUnderstanding: React.FC = () => {
         />
       )}
 
-      {bizSelectedNode && !bizLocalRelevant && !isBizLocalLoading && (
+      {bizSelectedNode && !bizLocalRelevant && (
         <GptComponent
           queryType='P5_R5_componentRelationAnalysis'
           params={{ relatedComponent: bizSelectedNode }}

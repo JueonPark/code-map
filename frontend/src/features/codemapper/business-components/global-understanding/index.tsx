@@ -94,7 +94,7 @@ const BizGlobalUnderstanding: React.FC = () => {
           <>{renderDisclosureItems(understandings)}</>
         )}
       </div>
-      {!loading && !bizGlobal && (
+      {!bizGlobal && (
           <GptComponent
             queryType='P2_R2_systemStructureDot'
             onResponseReceived={handleResponseReceived}
