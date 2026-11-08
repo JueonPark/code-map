@@ -1,5 +1,11 @@
 # CodeMap
 
+## Review structural changes
+
+Compare a local Git repository's base/head refs from **Review structural changes** on the home page. CodeMap maps file changes and Python import dependencies, preserves before/after positions, and links each relationship to pinned source evidence and a diff. The comparison runs locally without an API key and leaves your working tree untouched.
+
+See [Git comparison setup, analysis scope, and tests](docs/structural-comparison.md).
+
 ## Local project import
 
 You can now import your own codebase from a **directory path or ZIP archive**. Review the included/excluded files before starting Business Components or Function Call analysis. Chat and explanations use the same approved source snapshot.

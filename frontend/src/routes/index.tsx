@@ -5,6 +5,7 @@ import { Routes, Route } from 'react-router-dom';
 import FunctionCall from '@/features/codemapper/function-call';
 import BusinessComponents from '@/features/codemapper/business-components';
 import ProjectImport from '@/features/project-import';
+import StructuralCompare from '@/features/structural-compare';
 
 export const AppRouter = () => {
   return (
@@ -18,6 +19,7 @@ export const AppRouter = () => {
          */}
         <Route path='/' element={<App />}>
           <Route index element={<ProjectImport />} />
+          <Route path='/compare' element={<StructuralCompare />} />
           <Route path='/legacy' element={<CodeMapper />} />
           <Route path='/understand/business-comps' element={<BusinessComponents />} />
           <Route path='/understand/function-call' element={<FunctionCall />} />
