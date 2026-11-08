@@ -1,0 +1,45 @@
+const assert = require('node:assert/strict');
+const { chromium } = require(process.env.CODEMAP_PLAYWRIGHT || 'playwright');
+(async () => {
+  const fixture = JSON.parse(process.env.CODEMAP_LIVE_FIXTURE);
+  const browser = await chromium.launch({headless: true, ...(process.env.CODEMAP_CHROME ? {executablePath: process.env.CODEMAP_CHROME} : {})});
+  try {
+    const page = await browser.newPage({viewport: {width: 1440, height: 1000}});
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.goto('http://127.0.0.1:5174/compare');
+    await page.getByLabel('Git repository path').fill(fixture.path);
+    await page.getByLabel('Base ref', {exact: true}).fill('main');
+    await page.getByLabel('Head ref', {exact: true}).fill('feature');
+    const response = page.waitForResponse(r => r.url().endsWith('/api/compare'));
+    await page.getByRole('button', {name: 'Compare revisions'}).click();
+    const actual = await (await response).json();
+    assert.equal(actual.mergeBaseSha, fixture.mergeBaseSha);
+    assert.equal(actual.headSha, fixture.headSha);
+    await page.getByRole('heading', {name: 'repo — structural changes'}).waitFor();
+    await page.getByRole('button', {name: 'Inspect import pkg/main.py → pkg/new.py', exact: true}).click();
+    await page.getByRole('button', {name: 'After source', exact: true}).click();
+    await page.locator('[data-source-line="1"].evidence-line').waitFor();
+    assert.match(await page.getByTestId('source-detail').innerText(), /from \. import new/);
+    await page.getByRole('button', {name: 'Inspect pkg/renamed.py', exact: true}).click();
+    await page.getByTestId('source-detail').getByText('rename from pkg/moved.py', {exact: true}).waitFor();
+    await page.getByRole('button', {name: 'Before source', exact: true}).click();
+    await page.getByTestId('source-detail').getByText('def stable():', {exact: true}).waitFor();
+    await page.getByRole('checkbox', {name: 'Changed neighborhood'}).uncheck();
+    await page.getByLabel('Filter files').fill('README');
+    await page.getByRole('button', {name: 'Inspect README.md', exact: true}).click();
+    await page.getByRole('button', {name: 'After source', exact: true}).click();
+    await page.getByTestId('source-detail').getByText('Example', {exact: true}).waitFor();
+    assert.ok(!(await page.getByTestId('source-detail').innerText()).includes('uncommitted work'));
+    await page.getByLabel('Filter files').fill('');
+    await page.getByRole('button', {name: 'Inspect pkg/main.py', exact: true}).click();
+    await page.getByRole('button', {name: 'After source', exact: true}).click();
+    await page.getByTestId('source-detail').getByText('from . import new', {exact: true}).waitFor();
+    await page.locator('.structural-compare').evaluate(e => {e.scrollTop = 0;});
+    await page.screenshot({path: 'test-results/structural-comparison-live.png', fullPage: true});
+    await page.setViewportSize({width: 390, height: 844});
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    assert.deepEqual(errors, []);
+    console.log('PASS: live comparison, evidence lines, rename source/diff, search/context, committed-only content, narrow layout.');
+  } finally {await browser.close();}
+})().catch(e => {console.error(e); process.exit(1);});

@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 import app
 import git_compare as gc
+import python_imports
 from python_imports import extract_imports
 
 
@@ -188,6 +189,41 @@ class CompareTests(unittest.TestCase):
         self.assertIn('+value = 2', detail['diff'])
         with self.assertRaises(urllib.error.HTTPError):
             post('/api/compare/detail', {'id': 'expired', 'nodeId': node['id']})
+
+    def test_git_controls_symlinks_and_resource_bounds(self):
+        self.history()
+        # A tracked symlink can be created without filesystem symlink privileges.
+        oid = subprocess.check_output(['git', '-C', str(self.repo), 'hash-object', '-w', '--stdin'], input=b'../outside.py').decode().strip()
+        self.git('update-index', '--add', '--cacheinfo', '120000,' + oid + ',linked.py')
+        self.git('commit', '-m', 'tracked symlink')
+        self.git('config', 'diff.external', 'this-command-must-not-run')
+        with patch.dict(os.environ, {'GIT_DIR': str(self.repo / 'nonexistent')}):
+            result = self.compare(head='main')
+        self.assertTrue(any(n['path'] == 'linked.py' and 'Symlink' in n['reason'] for n in result['notices']))
+        self.assertFalse(any(n['afterPath'] == 'linked.py' for n in result['nodes']))
+        with patch.object(gc, 'MAX_FILES', 2):
+            with self.assertRaisesRegex(ValueError, 'limit'):
+                self.compare()
+        with patch.object(gc, 'MAX_TOTAL', 4):
+            with self.assertRaisesRegex(ValueError, 'limit'):
+                self.compare()
+        with self.assertRaisesRegex(ValueError, 'limit'):
+            gc.git(self.repo, 'log', '--oneline', limit=1)
+
+    def test_analysis_output_is_bounded_and_module_ancestors_are_checked(self):
+        files = {'main.py': {'content': 'import helper\nimport helper\nimport helper\n'}, 'helper.py': {'content': ''}}
+        with patch.object(python_imports, 'MAX_REFERENCES', 2):
+            with self.assertRaisesRegex(ValueError, 'limit'):
+                extract_imports(files, 'revision')
+        with patch.object(python_imports, 'MAX_NOTICES', 2):
+            with self.assertRaisesRegex(ValueError, 'limit'):
+                extract_imports({'main.py': {'content': 'import a\nimport b\nimport c\n'}}, 'revision')
+        edges, notices = extract_imports({
+            'main.py': {'content': 'import blocked.child\n'},
+            'blocked.py': {'content': ''}, 'blocked/child.py': {'content': ''},
+        }, 'revision')
+        self.assertEqual(edges, [])
+        self.assertTrue(any('package' in n['reason'] for n in notices))
 
 
 if __name__ == '__main__':

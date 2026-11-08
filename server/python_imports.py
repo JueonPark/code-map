@@ -1,6 +1,10 @@
 """Conservative, non-executing Python import analysis for a single source root."""
 import ast
+import hashlib
 from pathlib import PurePosixPath
+
+MAX_REFERENCES = 10000
+MAX_NOTICES = 10000
 
 
 def extract_imports(files, revision, source_root=''):
@@ -8,6 +12,8 @@ def extract_imports(files, revision, source_root=''):
     prefix = source_root.rstrip('/') + '/' if source_root else ''
 
     def notice(path, reason, line=None):
+        if len(notices) >= MAX_NOTICES:
+            raise ValueError('Python analysis notice limit exceeded; select a smaller source directory.')
         notices.append({'revision': revision, 'path': path, 'reason': reason, 'line': line})
 
     for path, file in sorted(files.items()):
@@ -29,6 +35,16 @@ def extract_imports(files, revision, source_root=''):
             notice(path, 'Python syntax could not be analyzed: ' + type(exc).__name__, getattr(exc, 'lineno', None))
 
     def resolve(name, path, line, quiet=False):
+        parts = name.split('.')
+        for end in range(1, len(parts)):
+            parent = '.'.join(parts[:end])
+            candidates = modules.get(parent, [])
+            if len(candidates) > 1:
+                notice(path, f'Ambiguous package {parent}: no target selected for {name}.', line)
+                return None
+            if candidates and not candidates[0].endswith('/__init__.py'):
+                notice(path, f'Unresolved import {name}: {parent} is a module, not a package.', line)
+                return None
         candidates = modules.get(name, [])
         if len(candidates) == 1:
             return candidates[0]
@@ -84,7 +100,10 @@ def extract_imports(files, revision, source_root=''):
             ):
                 notice(path, 'Possible dynamic import: target is not resolved by static analysis.', node.lineno)
             for target in sorted(targets):
+                if len(edges) >= MAX_REFERENCES:
+                    raise ValueError('Python dependency reference limit exceeded; select a smaller source directory.')
+                text = '\n'.join(lines[node.lineno - 1:node.end_lineno])
                 edges.append({'source': path, 'target': target, 'kind': 'import', 'revision': revision,
                               'path': path, 'startLine': node.lineno, 'endLine': node.end_lineno,
-                              'text': '\n'.join(lines[node.lineno - 1:node.end_lineno])})
+                              'text': text[:512], 'textHash': hashlib.sha256(text.encode()).hexdigest()})
     return edges, notices

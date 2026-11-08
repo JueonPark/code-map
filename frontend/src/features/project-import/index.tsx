@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { currentProject, localRequest, Project } from '@/project';
 export default function ProjectImport() {
   const [path, setPath] = useState('');
@@ -27,6 +28,7 @@ export default function ProjectImport() {
   }
   return <main className="mx-auto max-w-4xl p-8 overflow-y-auto h-screen">
     <h1 className="text-3xl font-semibold">Import a project</h1>
+    <Link to="/compare" className="block my-4 text-blue-700 underline">Review structural changes</Link>
     <p className="my-4">Choose a directory or ZIP archive. Review the source list before sending anything to AI.</p>
     {current && <p className="mb-4">Current project: <strong>{current.name}</strong>. Import another project to switch.</p>}
     <form onSubmit={e => {e.preventDefault(); void load('path', {path});}} className="border rounded-lg p-4">

@@ -202,8 +202,8 @@ def compare_repository(path, base, head, roots, source_root=''):
             edge = edges.setdefault(edge_id, {'id': edge_id, 'source': source, 'target': target, 'kind': 'import', 'before': [], 'after': []})
             edge[side].append(evidence)
     for edge in edges.values():
-        old = [e['text'] for e in edge['before']]
-        new = [e['text'] for e in edge['after']]
+        old = [e['textHash'] for e in edge['before']]
+        new = [e['textHash'] for e in edge['after']]
         edge['status'] = 'added' if not old else 'removed' if not new else 'modified' if old != new else 'unchanged'
     notices = before_notices + after_notices + before_gaps + after_gaps
     for node in nodes:
