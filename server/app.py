@@ -227,6 +227,21 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('Expected a JSON object.')
             if self.path == '/api/status':
                 result = {'ready': bool(os.environ.get('OPENAI_API_KEY') and os.environ.get('OPENAI_MODEL')), 'model': os.environ.get('OPENAI_MODEL', ''), 'roots': [str(p) for p in self.server.roots]}
+            elif self.path == '/api/compare':
+                from git_compare import compare_repository, public_comparison
+                comparison = compare_repository(body.get('path'), body.get('base'), body.get('head'), self.server.roots, body.get('sourceRoot', ''))
+                with self.server.lock:
+                    if len(self.server.comparisons) >= 8:
+                        del self.server.comparisons[next(iter(self.server.comparisons))]
+                    self.server.comparisons[comparison['id']] = comparison
+                result = public_comparison(comparison)
+            elif self.path == '/api/compare/detail':
+                from git_compare import comparison_detail
+                with self.server.lock:
+                    comparison = self.server.comparisons.get(body.get('id'))
+                if comparison is None:
+                    raise ValueError('Comparison expired. Run the comparison again.')
+                result = comparison_detail(comparison, body.get('nodeId'))
             elif self.path.startswith('/api/import/'):
                 if self.path == '/api/import/path':
                     if not isinstance(body.get('path'), str) or not body['path'].strip():
@@ -266,6 +281,7 @@ def main():
     server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
     server.roots = [p.resolve(strict=True) for p in args.root]
     server.origin, server.projects, server.lock = args.origin, {}, threading.Lock()
+    server.comparisons = {}
     print(f'CodeMap local service: http://127.0.0.1:{args.port}', flush=True)
     server.serve_forever()
 
