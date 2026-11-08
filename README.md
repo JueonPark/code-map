@@ -4,7 +4,7 @@
 
 Compare a local Git repository's base/head refs from **Review structural changes** on the home page. CodeMap maps file changes and Python import dependencies, preserves before/after positions, and links each relationship to pinned source evidence and a diff. The comparison runs locally without an API key and leaves your working tree untouched.
 
-See [Git comparison setup, analysis scope, real commit walkthrough, and tests](docs/structural-comparison.md).
+See [Git comparison setup, analysis scope, and tests](docs/structural-comparison.md).
 
 ## Local project import
 

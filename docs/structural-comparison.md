@@ -8,7 +8,7 @@ Open **Review structural changes** from the project import page, or visit `/comp
 2. Start the service: `python server/app.py --root /path/to/projects`.
 3. In `frontend`, run `npm ci` and `npm run dev`. Open `http://127.0.0.1:5173/compare`.
 4. Enter a non-bare repository's root directory, a base ref, and a head ref. Refs can be branches, tags, or commit expressions such as `HEAD~1`.
-5. Optionally enter a **Python source directory**, relative to the repository, such as `src` or `libreloc/python`. This both limits included files and defines the Python import root. Leave it empty for imports rooted at the repository root. Use forward slashes.
+5. Optionally enter a **Python source directory**, relative to the repository, such as `src` or `python`. This both limits included files and defines the Python import root. Leave it empty for imports rooted at the repository root. Use forward slashes.
 6. Select **Compare revisions**. The displayed before snapshot is the single merge base of the resolved base/head commits; the after snapshot is the resolved head commit. The requested base's SHA is shown separately because it may have advanced since the branches diverged.
 
 Windows paths work with a Windows service. For a WSL repository, run the service inside WSL and enter its Linux path, with a matching `--root`. Use the existing [import setup](project-import.md) for the frontend and local service configuration. Native Windows access to WSL UNC Git repositories has not been independently validated; running Git and the service inside WSL was validated.
@@ -34,22 +34,6 @@ Conditional, function-local, and type-checking-only imports are included as sour
 The path/ZIP import exclusions also apply here: secret-like filenames, dependency/build directories, binary/non-UTF-8 content, and unsupported file types are reported and excluded. Tracked symlinks and submodules are reported and never followed. Source evidence is served only for files in the cached comparison; arbitrary paths cannot be requested.
 
 Per snapshot: at most 2,000 scoped entries, 256 KiB per included file, and 2 MiB total included bytes. Git tree/diff metadata output is capped at 1 MiB, each Git process has a 20-second timeout, and Python extraction is capped at 10,000 import references and 10,000 analysis notices per snapshot. Exceeding a limit fails explicitly; choose a smaller source directory or repository. The metadata cap applies to the repository even with a source-directory filter. Evidence previews are capped at 512 characters while retaining full source ranges and a statement hash for change classification. Full included source is available in the detail view.
-
-## Real commit walkthrough
-
-Validated against the local `sym` repository's prepared-program/torch.compile change (commit labeled PR #255):
-
-| Input | Value |
-| --- | --- |
-| Base | `55accf6e9251fc44e354a2f150efa4ad532d48f2` |
-| Head | `a5cba012bedb963ef20c79afb0e744daa0f4c7df` |
-| Python source directory | `libreloc/python` |
-
-Run the service with access to the local `sym` checkout, then enter those inputs in `/compare`. No network fetch is performed, so the checkout must already contain these commits.
-
-Observed result: **151 file nodes** (147 unchanged, 2 modified, 2 added) and **456 dependency relationships** (448 unchanged, 7 added, 1 modified). `reloc_torch/fast.py` gains an import dependency on the new `reloc_torch/fast_ops.py`. The new module imports `compat.py`, `ops.py`, and `cache.py`; the new test file connects to `fast.py`, `fast_ops.py`, and `artifact.py`. The existing `fast.py` -> `symbolic.py` import statement changes. `cache.py` remains visibly modified even without a changed outgoing dependency. These are source-level observations, not a claim that every branch executes.
-
-The selected scope excludes the same commit's benchmark/documentation changes and all cross-language runtime behavior. Coverage notices include external imports such as PyTorch and unresolved imported attributes. The original checkout's dirty status was identical before and after the comparison. This is a single-case walkthrough, not an evaluation of review accuracy or time savings.
 
 ## Verification
 

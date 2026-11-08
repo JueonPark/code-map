@@ -49,11 +49,11 @@
 - [x] Verify browser scenario, production build, and targeted ESLint. Expected: pass; document existing unrelated typecheck failures.
 - [x] Commit the UI and record results.
 
-## Task 3: Real comparison, documentation, independent review, PR
+## Task 3: Integration verification, documentation, independent review, PR
 
 **Files:** docs/structural-comparison.md, README.md, supporting regression tests if review requires them.
 
-- [x] Run a real local repository commit comparison and record SHAs, observed structural changes, limitations, and reproduction commands.
-- [x] Document setup, supported import resolution, limits, source-directory selection, and acceptance walkthrough.
+- [x] Verify pinned commits, structural changes, and source navigation using a disposable Git repository through the local service and browser.
+- [x] Document setup, supported import resolution, limits, source-directory selection, and reproducible test commands.
 - [x] Run the required suites/build; dispatch a fresh reviewer with this spec, plan, and complete diff. Reproduce and fix important findings with regression tests.
-- [ ] Push a feature branch and create a PR with Closes #3 and truthful validation/limitations. Do not merge automatically.
+- [x] Push a feature branch and create a PR with Closes #3 and truthful validation/limitations. Do not merge automatically.
