@@ -22,7 +22,7 @@ def git(repo, *args, data=None, limit=MAX_TREE, allow_failure=False):
     # Discard inherited Git overrides (including injected config/worktree paths).
     env = {k: v for k, v in os.environ.items() if not k.upper().startswith('GIT_')}
     env.update(GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull, GIT_TERMINAL_PROMPT='0',
-               GIT_NO_LAZY_FETCH='1', GIT_OPTIONAL_LOCKS='0', LC_ALL='C')
+               GIT_NO_LAZY_FETCH='1', GIT_NO_REPLACE_OBJECTS='1', GIT_OPTIONAL_LOCKS='0', LC_ALL='C')
     command = ['git', '--no-pager', '-c', 'core.fsmonitor=false', '-c', 'core.quotePath=false',
                '-c', 'core.hooksPath=' + os.devnull, '-C', str(repo), *args]
     timed_out = threading.Event()

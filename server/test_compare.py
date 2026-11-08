@@ -155,7 +155,8 @@ class CompareTests(unittest.TestCase):
         }.items()}
         edges, notices = extract_imports(files, 'revision', 'src')
         refs = [e for e in edges if e['source'] == 'src/pkg/use.py' and e['target'] == 'src/pkg/helper.py']
-        self.assertEqual([e['startLine'] for e in refs], [1, 2, 4])
+        self.assertEqual([e['startLine'] for e in refs], [1, 4])
+        self.assertTrue(any(e['source'] == 'src/pkg/use.py' and e['target'] == 'src/pkg/__init__.py' and e['startLine'] == 2 for e in edges))
         self.assertTrue(all(e['revision'] == 'revision' and e['endLine'] >= e['startLine'] for e in edges))
         self.assertTrue(any('ambiguous' in n['reason'].lower() for n in notices))
         self.assertTrue(any('syntax' in n['reason'].lower() for n in notices))
@@ -224,6 +225,53 @@ class CompareTests(unittest.TestCase):
         }, 'revision')
         self.assertEqual(edges, [])
         self.assertTrue(any('package' in n['reason'] for n in notices))
+
+    def test_replacement_objects_cannot_change_pinned_source_or_ancestry(self):
+        original_base, original_head = self.history()
+        self.git('checkout', '-b', 'replacement')
+        self.write('pkg/util.py', 'replacement = 999\n')
+        replacement = self.commit('replacement contents')
+        self.git('replace', original_head, replacement)
+        result = self.compare(base=original_base, head=original_head)
+        self.assertEqual(result['headSha'], original_head)
+        self.assertEqual(result['mergeBaseSha'], original_base)
+        node = next(n for n in result['nodes'] if n['afterPath'] == 'pkg/util.py')
+        self.assertEqual(gc.comparison_detail(result, node['id'])['after']['content'], 'value = 2\n')
+        self.assertEqual(self.git('replace', '-l'), original_head, 'Do not change the user replacement configuration')
+
+    def test_package_attributes_and_reexports_take_precedence_over_child_files(self):
+        for declaration in ['helper = 7\n', 'helper: int = 7\n', 'from .actual import helper\n']:
+            files = {p: {'content': text} for p, text in {
+                'main.py': 'from pkg import helper\n',
+                'pkg/use.py': 'from . import helper\n',
+                'pkg/__init__.py': declaration,
+                'pkg/helper.py': 'VALUE = 3\n',
+                'pkg/actual.py': 'helper = 7\n',
+            }.items()}
+            edges, notices = extract_imports(files, 'revision')
+            for importer in ['main.py', 'pkg/use.py']:
+                targets = {e['target'] for e in edges if e['source'] == importer}
+                self.assertEqual(targets, {'pkg/__init__.py'}, (declaration, importer, targets))
+            self.assertTrue(any('declared' in n['reason'] for n in notices))
+        # The import being analyzed must not count as an already initialized attribute.
+        edges, _ = extract_imports({'pkg/__init__.py': {'content': 'from . import helper\nhelper = 7\n'},
+                                   'pkg/helper.py': {'content': ''}}, 'revision')
+        self.assertEqual([(e['source'], e['target']) for e in edges], [('pkg/__init__.py', 'pkg/helper.py')])
+
+    def test_missing_promisor_objects_are_never_fetched(self):
+        self.history()
+        donor = Path(self.tmp.name) / 'donor'
+        subprocess.check_call(['git', 'clone', '--no-hardlinks', str(self.repo), str(donor)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        oid = self.git('rev-parse', 'feature:pkg/new.py')
+        self.git('config', 'remote.origin.url', str(donor))
+        self.git('config', 'remote.origin.promisor', 'true')
+        self.git('config', 'extensions.partialClone', 'origin')
+        loose = self.repo / '.git' / 'objects' / oid[:2] / oid[2:]
+        loose.chmod(0o600)  # Git marks loose objects read-only on Windows.
+        loose.unlink()
+        with self.assertRaises(ValueError):
+            gc.git(self.repo, 'cat-file', '-p', oid)
+        self.assertFalse(loose.exists(), 'A comparison must not materialize missing objects')
 
 
 if __name__ == '__main__':

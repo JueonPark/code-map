@@ -33,10 +33,10 @@
 
 **Interfaces:** compare_repository(path, base, head, roots, source_root='') -> comparison including private snapshots; public_comparison removes private data; comparison_detail(comparison, node_id) -> before/after source and unified diff. POST /api/compare accepts path/base/head/sourceRoot; POST /api/compare/detail accepts id/nodeId. Store at most eight comparisons.
 
-- [ ] Write and run failing tests using real temporary Git histories for merge-base semantics, renames, added/removed edges, content-only changes, deletions, dirty-tree preservation, unsupported/unresolved content, and validation/limits.
-- [ ] Implement bounded Git object reads, Python AST imports with evidence, matching and diff detail; add protected HTTP routes and tests.
-- [ ] Verify: python -m unittest discover -s server -p 'test_*.py' -v. Expected: all tests pass (platform-specific symlink tests may skip on Windows).
-- [ ] Commit the backend and record results.
+- [x] Write and run failing tests using real temporary Git histories for merge-base semantics, renames, added/removed edges, content-only changes, deletions, dirty-tree preservation, unsupported/unresolved content, and validation/limits.
+- [x] Implement bounded Git object reads, Python AST imports with evidence, matching and diff detail; add protected HTTP routes and tests.
+- [x] Verify: python -m unittest discover -s server -p 'test_*.py' -v. Expected: all tests pass (platform-specific symlink tests may skip on Windows).
+- [x] Commit the backend and record results.
 
 ## Task 2: Review UI
 
@@ -44,16 +44,16 @@
 
 **Interfaces:** Consume public comparison metadata/nodes/edges/notices and detail responses from Task 1. Source ranges are 1-based inclusive, node IDs span both revisions, edge direction is importer -> imported.
 
-- [ ] Write and run a failing browser scenario for entry link, comparison form, graph/evidence navigation, view toggles, modified-only files, filters, errors, and comparison switching with an in-flight detail response.
-- [ ] Implement the accessible form and stable SVG union graph with file/directory navigation, change legend, changed-neighborhood focus, direct importers, and source/diff detail. Reuse the local request helper and app routing.
-- [ ] Verify browser scenario, production build, and targeted ESLint. Expected: pass; document existing unrelated typecheck failures.
-- [ ] Commit the UI and record results.
+- [x] Write and run a failing browser scenario for entry link, comparison form, graph/evidence navigation, view toggles, modified-only files, filters, errors, and comparison switching with an in-flight detail response.
+- [x] Implement the accessible form and stable SVG union graph with file/directory navigation, change legend, changed-neighborhood focus, direct importers, and source/diff detail. Reuse the local request helper and app routing.
+- [x] Verify browser scenario, production build, and targeted ESLint. Expected: pass; document existing unrelated typecheck failures.
+- [x] Commit the UI and record results.
 
 ## Task 3: Real comparison, documentation, independent review, PR
 
 **Files:** docs/structural-comparison.md, README.md, supporting regression tests if review requires them.
 
-- [ ] Run a real local repository commit comparison and record SHAs, observed structural changes, limitations, and reproduction commands.
-- [ ] Document setup, supported import resolution, limits, source-directory selection, and acceptance walkthrough.
-- [ ] Run the required suites/build; dispatch a fresh reviewer with this spec, plan, and complete diff. Reproduce and fix important findings with regression tests.
+- [x] Run a real local repository commit comparison and record SHAs, observed structural changes, limitations, and reproduction commands.
+- [x] Document setup, supported import resolution, limits, source-directory selection, and acceptance walkthrough.
+- [x] Run the required suites/build; dispatch a fresh reviewer with this spec, plan, and complete diff. Reproduce and fix important findings with regression tests.
 - [ ] Push a feature branch and create a PR with Closes #3 and truthful validation/limitations. Do not merge automatically.

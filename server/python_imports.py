@@ -54,10 +54,14 @@ def extract_imports(files, revision, source_root=''):
             notice(path, f'Unresolved or external import: {name}.', line)
         return None
 
-    def declared(path, name):
+    def declared(path, name, before_line=None):
         if path not in parsed:
             return False
         for item in parsed[path][1].body:
+            # Inside a package initializer, its current/later import cannot yet
+            # establish the attribute used to resolve that very import.
+            if before_line is not None and item.lineno >= before_line:
+                continue
             if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and item.name == name:
                 return True
             targets = item.targets if isinstance(item, ast.Assign) else [item.target] if isinstance(item, ast.AnnAssign) else []
@@ -86,7 +90,13 @@ def extract_imports(files, revision, source_root=''):
                     name = '.'.join(package[:len(package) - node.level + 1] + ([name] if name else []))
                 for alias in node.names:
                     child = name + '.' + alias.name if name else alias.name
-                    if alias.name != '*' and child in modules:
+                    parents = modules.get(name, [])
+                    parent = parents[0] if len(parents) == 1 else None
+                    if parent and alias.name != '*' and declared(parent, alias.name, node.lineno if parent == path else None):
+                        target = parent
+                        if child in modules:
+                            notice(path, f'Imported name {child} is declared by {parent}; the parent dependency is recorded instead of assuming the child file is imported.', node.lineno)
+                    elif alias.name != '*' and child in modules:
                         target = resolve(child, path, node.lineno)
                     else:
                         target = resolve(name, path, node.lineno)
