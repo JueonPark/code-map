@@ -13,6 +13,7 @@ import urllib.error
 from http.server import ThreadingHTTPServer
 from app import Handler
 from app import import_path, import_zip, analyze
+import app
 
 
 def archive(entries):
@@ -26,6 +27,57 @@ def archive(entries):
 
 
 class ImportTests(unittest.TestCase):
+    def test_directory_and_zip_above_legacy_size_limits(self):
+        # 45 x 256 KiB exceeds both the old 2 MiB source and 10 MiB upload caps.
+        content = b'#' * (256 * 1024)
+        entries = {f'file_{i}.py': content for i in range(45)}
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for name, raw in entries.items():
+                (root / name).write_bytes(raw)
+            directory = import_path(str(root), [root])
+            zipped = import_zip(archive(entries), 'large.zip')
+        self.assertEqual(directory['size'], 11796480)
+        self.assertEqual(directory['files'], zipped['files'])
+
+    def test_enough_entries_to_reach_one_gib_with_per_file_cap(self):
+        # 4,096 files at the retained 256 KiB cap can hold 1 GiB.
+        project = import_zip(archive({f'file_{i}.py': 'x' for i in range(4096)}), 'many.zip')
+        self.assertEqual(len(project['files']), 4096)
+
+    def test_source_and_upload_exact_boundaries(self):
+        with tempfile.TemporaryDirectory() as d, patch('app.MAX_TOTAL', 8):
+            root = Path(d)
+            (root / 'a.py').write_bytes(b'1234')
+            (root / 'b.py').write_bytes(b'5678')
+            self.assertEqual(import_path(str(root), [root])['size'], 8)
+            self.assertEqual(import_zip(archive({'a.py': '1234', 'b.py': '5678'}), 'exact.zip')['size'], 8)
+            (root / 'b.py').write_bytes(b'56789')
+            with self.assertRaisesRegex(ValueError, 'source limit'):
+                import_path(str(root), [root])
+            with self.assertRaisesRegex(ValueError, 'uncompressed'):
+                import_zip(archive({'a.py': '1234', 'b.py': '56789'}), 'over.zip')
+        raw = archive({'a.py': 'ok'})
+        with patch('app.MAX_UPLOAD', len(raw)):
+            self.assertEqual(import_zip(raw, 'exact.zip')['size'], 2)
+            with self.assertRaisesRegex(ValueError, 'upload limit'):
+                import_zip(raw + b'x', 'over.zip')
+
+    def test_zip_stream_handles_short_reads_and_truncation(self):
+        class ShortReads(io.BytesIO):
+            def read(self, size=-1):
+                if size < 0 or size > 1024 * 1024:
+                    raise AssertionError('Upload must be read in bounded chunks')
+                return super().read(min(size, 31))
+        raw = archive({'a.py': 'print(42)'})
+        project = app.receive_zip(ShortReads(raw), len(raw))
+        self.assertEqual(project['files'][0]['content'], 'print(42)')
+        with self.assertRaisesRegex(ValueError, 'Incomplete'):
+            app.receive_zip(ShortReads(raw[:-1]), len(raw))
+        with tempfile.TemporaryFile() as upload:
+            upload.write(raw)
+            self.assertEqual(import_zip(upload, 'disk.zip')['size'], 9)
+
     def test_path_zip_equivalence_and_exclusions(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -154,6 +206,17 @@ class ImportTests(unittest.TestCase):
                 preview = json.load(response)
             self.assertFalse(preview['approved'])
             self.assertNotIn('content', preview['files'][0])
+            # Exercise the real HTTP upload path above the previous 10 MiB cap.
+            large = archive({f'f{i}.py': b'x' * (256 * 1024) for i in range(41)})
+            with urllib.request.urlopen(urllib.request.Request(url, data=large, headers=headers)) as response:
+                self.assertEqual(json.load(response)['size'], 10747904)
+            # Reject advertised >1 GiB uploads before reading/allocating their body.
+            for endpoint, length in [('import/zip', 1073741825), ('import/path', 10485761)]:
+                request = urllib.request.Request(url.replace('import/zip', endpoint), data=b'', headers={**headers, 'Content-Length': str(length)})
+                with self.assertRaises(urllib.error.HTTPError) as error:
+                    urllib.request.urlopen(request)
+                self.assertEqual(error.exception.code, 400)
+                self.assertIn('exceeds', json.load(error.exception)['error'])
         finally:
             server.shutdown()
             server.server_close()

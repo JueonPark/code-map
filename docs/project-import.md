@@ -16,18 +16,20 @@ Paths are interpreted by the Python service, not the browser. A service inside U
 
 ## Preview and limits
 
-Both methods produce the same relative-path/source model. A ZIP's single wrapping directory is removed. ZIP contents are read in memory and never extracted to disk. Symlinks and ZIP traversal paths are rejected. Source files remain unchanged.
+Both methods produce the same relative-path/source model. A ZIP's single wrapping directory is removed. ZIP uploads are streamed in chunks of at most 1 MiB into a temporary archive file, which is deleted after import succeeds or fails; archive entries are never extracted to filesystem paths. Allow up to 1 GiB of free space in the service's temporary directory for an upload. Symlinks and ZIP traversal paths are rejected. Source files remain unchanged.
 
 Before reading, the service validates the actual opened file handle and its regular-file type, so replacing a source path or ancestor with a symlink during import cannot read outside the project. Linux requires `/proc/self/fd`; Windows uses `GetFinalPathNameByHandleW`.
 
 Model-generated SVG links and resource/event attributes are removed before insertion. Provider failures and malformed graph/explanation output show a retry action in place, including local-node analyses.
 
-- Up to 2,000 entries, 256 KiB per included source file, 2 MiB of included source per project; ZIP total uncompressed size is also limited to 2 MiB (including excluded entries). ZIP upload limit: 10 MiB.
+- Up to 10,000 entries, 256 KiB per included source file, **1 GiB (1,024 MiB / 1,073,741,824 bytes)** of included source per project. ZIP upload and total uncompressed size are each limited to 1 GiB; the uncompressed limit includes excluded entries. The higher entry count allows projects to reach 1 GiB while retaining the per-file cap. JSON API requests retain their separate 10 MiB limit.
 - UTF-8 source/documentation/configuration formats listed in `server/app.py`; unsupported, binary and non-UTF-8 files are excluded.
 - `.git`, dependency/virtualenv/cache directories, common build directories, `.aws`, `.ssh`, `.env*`, `id_*`, credential/secret filenames and key/certificate extensions are excluded by default. These filename rules cannot identify secrets embedded in ordinary source; review the preview and prepare a clean directory/archive when needed.
-- At most eight immutable snapshots are retained in service memory; restart the service to clear them. This also invalidates browser project IDs; reimport after a restart. Snapshots are not watched for changes.
+- At most eight immutable snapshots are retained in service memory; restart the service to clear them. Decoded source, snapshot metadata, and analysis payloads still consume memory and can require several times the source byte count. Streaming the ZIP avoids an additional full archive buffer; it does not make snapshots disk-backed. This also invalidates browser project IDs; reimport after a restart. Snapshots are not watched for changes.
 
-Analysis sends the complete approved source snapshot, task prompt and (for chat) up to 18 previous messages to OpenAI's Responses API with `store: false`. There is no vector-store upload or remote Assistant mutation. Provider access/quota/context errors are displayed; a successful import does not guarantee the configured model can analyze a project of that size. API calls may incur charges. The provider key and errors containing provider response bodies are never sent to the browser.
+Analysis sends the complete approved source snapshot, task prompt and (for chat) up to 18 previous messages to OpenAI's Responses API with `store: false`. There is no vector-store upload or remote Assistant mutation. The 1 GiB limit is an import/preview allowance, not a model context allowance: this patch does not add chunking or indexing for monorepo analysis. Select a smaller source directory for analysis. Provider access/quota/context errors are displayed; a successful import does not guarantee the configured model can analyze a project of that size. API calls may incur charges. The provider key and errors containing provider response bodies are never sent to the browser.
+
+These limits apply to project imports only. Git structural comparison retains its separate limits documented in `docs/structural-comparison.md`.
 
 Switching projects performs a full navigation after approval, clearing in-memory Zustand graph/selection caches and chat history. The current project name and switch link remain in the analysis header. Use the import home page to review again or select another project.
 
@@ -36,6 +38,8 @@ The Vite proxy forwards `/api` to the loopback service. The service checks the e
 ## Tests
 
 `python -m unittest discover -s server -v` checks path/ZIP equivalence, exclusions, malformed/escaping/symlink archives, limits, request origin checks, approval gating, provider payloads and errors.
+
+Optional full-size check: `python tests/import-large.py` generates 4,096 temporary source files, imports exactly 1 GiB through directory and streamed ZIP paths, and checks that adding one byte is rejected. Allow roughly 2 GiB of free RAM and 1.1 GiB of temporary disk space. Fixtures are removed automatically. The regular suite uses smaller boundary fixtures and a real HTTP ZIP upload above the old 10 MiB cap.
 
 `cd frontend && npm run build` builds the app. The original prototype has unrelated type errors in unused `gpt/usage` examples; Vite build does not type-check those examples.
 
