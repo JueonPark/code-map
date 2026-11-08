@@ -30,6 +30,7 @@ export default function ProjectImport() {
     <h1 className="text-3xl font-semibold">Import a project</h1>
     <Link to="/compare" className="block my-4 text-blue-700 underline">Review structural changes</Link>
     <p className="my-4">Choose a directory or ZIP archive. Review the source list before sending anything to AI.</p>
+    <p className="text-sm text-gray-600 mb-4">Import limits: 1 GiB total source, 10,000 entries, 256 KiB per source file. ZIP archives also have a 1 GiB uncompressed limit. Your analysis model has a separate context limit.</p>
     {current && <p className="mb-4">Current project: <strong>{current.name}</strong>. Import another project to switch.</p>}
     <form onSubmit={e => {e.preventDefault(); void load('path', {path});}} className="border rounded-lg p-4">
       <label htmlFor="project-path">Local directory path</label>
@@ -37,7 +38,7 @@ export default function ProjectImport() {
       <p className="text-sm text-gray-600 mb-3">Paths are read by the local service. Run it inside WSL for Linux paths, or on Windows for Windows/WSL UNC paths.</p>
       <button disabled={busy || !path.trim()} className="bg-blue-700 disabled:opacity-40 text-white rounded px-4 py-2">Preview directory</button>
     </form>
-    <label className="block border rounded-lg p-4 my-4">ZIP archive (up to 10 MiB)
+    <label className="block border rounded-lg p-4 my-4">ZIP archive (up to 1 GiB / 1,024 MiB)
       <input aria-label="ZIP archive" type="file" accept=".zip,application/zip" disabled={busy} className="block mt-2" onChange={e => {const file=e.target.files?.[0]; if(file) void load('zip', file); e.target.value='';}} />
     </label>
     {busy && <p role="status">Working…</p>}

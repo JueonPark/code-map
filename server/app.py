@@ -5,6 +5,7 @@ import json
 import os
 import secrets
 import stat
+import tempfile
 import threading
 import urllib.error
 import urllib.request
@@ -13,10 +14,11 @@ import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 
-MAX_FILES = 2000
+MAX_FILES = 10000
 MAX_FILE = 256 * 1024
-MAX_TOTAL = 2 * 1024 * 1024
-MAX_UPLOAD = 10 * 1024 * 1024
+MAX_TOTAL = 1024 * 1024 * 1024  # 1 GiB of source / uncompressed ZIP entries.
+MAX_UPLOAD = 1024 * 1024 * 1024  # 1 GiB compressed ZIP upload.
+MAX_REQUEST = 10 * 1024 * 1024  # JSON requests do not need the ZIP allowance.
 SKIP_DIRS = {'.git', '.svn', '.hg', 'node_modules', 'build', 'dist', 'target', '.venv', 'venv', '__pycache__', '.cache', '.aws', '.ssh'}
 EXTENSIONS = {'.py', '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.cpp', '.cc', '.c', '.h', '.hpp', '.cu', '.rs', '.go', '.java', '.kt', '.rb', '.php', '.swift', '.cs', '.md', '.txt', '.json', '.yaml', '.yml', '.toml', '.xml', '.html', '.css', '.scss', '.sql', '.sh', '.cmake', '.td', '.mlir'}
 
@@ -135,10 +137,13 @@ def import_path(value, roots):
 
 
 def import_zip(raw, name):
-    if len(raw) > MAX_UPLOAD:
-        raise ValueError('ZIP exceeds 10 MiB upload limit.')
+    source = io.BytesIO(raw) if isinstance(raw, bytes) else raw
+    source.seek(0, io.SEEK_END)
+    if source.tell() > MAX_UPLOAD:
+        raise ValueError(f'ZIP exceeds the {MAX_UPLOAD}-byte (1 GiB) upload limit.')
+    source.seek(0)
     try:
-        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        with zipfile.ZipFile(source) as archive:
             infos = archive.infolist()
             if len(infos) > MAX_FILES or sum(i.file_size for i in infos) > MAX_TOTAL:
                 raise ValueError('ZIP exceeds file-count or total uncompressed-size limit.')
@@ -169,6 +174,21 @@ def import_zip(raw, name):
             return collect(next(iter(common)) if strip else Path(name).stem or 'ZIP project', source_entries())
     except (zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, zlib.error) as exc:
         raise ValueError('Invalid, encrypted or unsupported ZIP archive.') from exc
+
+
+def receive_zip(stream, length):
+    """Spool the upload to disk; never hold the entire archive in memory."""
+    if length < 0 or length > MAX_UPLOAD:
+        raise ValueError(f'ZIP exceeds the {MAX_UPLOAD}-byte (1 GiB) upload limit.')
+    with tempfile.TemporaryFile() as upload:
+        remaining = length
+        while remaining:
+            chunk = stream.read(min(remaining, 1024 * 1024))
+            if not chunk:
+                raise ValueError('Incomplete ZIP upload. Please retry.')
+            upload.write(chunk)
+            remaining -= len(chunk)
+        return import_zip(upload, 'Uploaded project.zip')
 
 
 def analyze(project, request):
@@ -219,10 +239,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(403, {'error': 'Request origin is not allowed.'})
                 return
             length = int(self.headers.get('Content-Length', '0'))
-            if length < 0 or length > MAX_UPLOAD:
-                raise ValueError('Request exceeds 10 MiB.')
-            raw = self.rfile.read(length)
-            body = {} if self.path == '/api/import/zip' else json.loads(raw or b'{}')
+            is_zip = self.path == '/api/import/zip'
+            limit = MAX_UPLOAD if is_zip else MAX_REQUEST
+            if length < 0 or length > limit:
+                raise ValueError(f'Request exceeds the {limit}-byte limit.')
+            body = {} if is_zip else json.loads(self.rfile.read(length) or b'{}')
             if not isinstance(body, dict):
                 raise ValueError('Expected a JSON object.')
             if self.path == '/api/status':
@@ -248,7 +269,7 @@ class Handler(BaseHTTPRequestHandler):
                         raise ValueError('Enter a project directory.')
                     project = import_path(body['path'], self.server.roots)
                 elif self.path == '/api/import/zip':
-                    project = import_zip(raw, 'Uploaded project.zip')
+                    project = receive_zip(self.rfile, length)
                 else:
                     raise ValueError('Unknown import endpoint.')
                 with self.server.lock:
